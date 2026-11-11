@@ -1,5 +1,7 @@
 package com.example.podcast.ui.navigation
 
+import android.net.Uri
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -26,7 +28,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.podcast.playback.PlaybackController
-import com.example.podcast.ui.components.ConflictResolutionDialog
 import com.example.podcast.ui.components.MiniPlayer
 import com.example.podcast.ui.screens.discover.DiscoverScreen
 import com.example.podcast.ui.screens.discover.DiscoverViewModel
@@ -141,13 +142,19 @@ fun AppNavigation(
                     SettingsScreen(viewModel = viewModel)
                 }
 
+                // *** FIXED: capture backStackEntry, decode argument, pass to ViewModel ***
                 composable(
                     route = Screen.PodcastDetail.route,
                     arguments = listOf(navArgument("podcastId") { type = NavType.StringType })
-                ) {
+                ) { backStackEntry ->
+                    val rawId = backStackEntry.arguments?.getString("podcastId").orEmpty()
+                    val podcastId = Uri.decode(rawId)
+                    Log.d("PodcastNav", "PodcastDetail received id: $podcastId")
+
                     val viewModel: PodcastDetailViewModel = hiltViewModel()
                     PodcastDetailScreen(
                         viewModel = viewModel,
+                        podcastId = podcastId,
                         onBackClick = { navController.popBackStack() },
                         onEpisodeClick = { _ -> navController.navigate(Screen.Player.route) }
                     )
@@ -162,7 +169,6 @@ fun AppNavigation(
                 }
             }
 
-            // Bottom MiniPlayer Overlay (visible when audio is active and not in full player)
             AnimatedVisibility(
                 visible = currentEpisode != null && currentDestination != Screen.Player.route,
                 modifier = Modifier.align(Alignment.BottomCenter),
