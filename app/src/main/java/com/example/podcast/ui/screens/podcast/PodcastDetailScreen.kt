@@ -67,6 +67,7 @@ fun PodcastDetailScreen(
     val currentSort by viewModel.currentSort.collectAsState()
     val downloadProgressMap by viewModel.downloadProgressMap.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
     Scaffold(
         topBar = {
@@ -89,6 +90,7 @@ fun PodcastDetailScreen(
         }
     ) { innerPadding ->
         val currentPod = podcast
+
         if (currentPod == null) {
             Box(
                 modifier = Modifier
@@ -97,13 +99,23 @@ fun PodcastDetailScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = if (isLoading) "Loading podcast..." else "Fetching feed...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (errorMessage != null) {
+                        Text(
+                            text = errorMessage ?: "",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(24.dp)
+                        )
+                    } else {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = if (isLoading) "Loading podcast..." else "Fetching feed...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
             return@Scaffold
@@ -214,14 +226,27 @@ fun PodcastDetailScreen(
                 }
             }
 
-            items(episodes) { episode ->
-                EpisodeRow(
-                    episode = episode,
-                    downloadProgress = downloadProgressMap[episode.id],
-                    onEpisodeClick = { onEpisodeClick(episode.id) },
-                    onPlayClick = { viewModel.playEpisode(episode) },
-                    onDownloadClick = { viewModel.toggleDownload(episode) }
-                )
+            if (isLoading && episodes.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            } else {
+                items(episodes) { episode ->
+                    EpisodeRow(
+                        episode = episode,
+                        downloadProgress = downloadProgressMap[episode.id],
+                        onEpisodeClick = { onEpisodeClick(episode.id) },
+                        onPlayClick = { viewModel.playEpisode(episode) },
+                        onDownloadClick = { viewModel.toggleDownload(episode) }
+                    )
+                }
             }
         }
     }
