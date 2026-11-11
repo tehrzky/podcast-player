@@ -39,7 +39,10 @@ class PodcastDetailViewModel @Inject constructor(
     private val settingsDataStore: SettingsDataStore
 ) : ViewModel() {
 
-    val podcastId: String = checkNotNull(savedStateHandle["podcastId"])
+    val podcastId: String = savedStateHandle.get<String>("podcastId").orEmpty()
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     val podcast: StateFlow<Podcast?> = podcastRepository.getPodcastById(podcastId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -56,11 +59,35 @@ class PodcastDetailViewModel @Inject constructor(
 
     val downloadProgressMap: StateFlow<Map<String, DownloadProgress>> = downloadManager.downloadProgressMap
 
-    init {
+    /**
+     * Ensure the podcast is persisted in Room before we try to read it.
+     * Called from the UI via LaunchedEffect(podcastId).
+     * - If it already exists locally: just load sort order.
+     * - If it's from search (not in Room yet): fetch its feed and insert.
+     */
+    fun loadPodcast(id: String) {
+        if (id.isBlank()) return
         viewModelScope.launch {
-            val pod = podcastRepository.getPodcastByIdSync(podcastId)
-            pod?.let {
-                _currentSort.value = it.defaultSortOrder
+            _isLoading.value = true
+            try {
+                // Check if it exists in local DB
+                val existing = podcastRepository.getPodcastByIdSync(id)
+
+                if (existing == null) {
+                    // Not in Room → try to fetch from feed URL (id IS the feed URL for search results)
+                    // This uses the repository's fetch-and-persist path.
+                    podcastRepository.subscribeAndFetch(id)
+                }
+
+                // After ensuring it exists, seed sort state
+                val pod = podcastRepository.getPodcastByIdSync(id)
+                pod?.let {
+                    _currentSort.value = it.defaultSortOrder
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("PodcastDetailVM", "Failed to load podcast $id", e)
+            } finally {
+                _isLoading.value = false
             }
         }
     }
