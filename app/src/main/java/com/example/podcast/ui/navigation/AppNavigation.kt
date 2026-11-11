@@ -1,7 +1,6 @@
 package com.example.podcast.ui.navigation
 
 import android.net.Uri
-import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -142,14 +141,13 @@ fun AppNavigation(
                     SettingsScreen(viewModel = viewModel)
                 }
 
-                // *** FIXED: capture backStackEntry, decode argument, pass to ViewModel ***
                 composable(
                     route = Screen.PodcastDetail.route,
                     arguments = listOf(navArgument("podcastId") { type = NavType.StringType })
                 ) { backStackEntry ->
                     val rawId = backStackEntry.arguments?.getString("podcastId").orEmpty()
                     val podcastId = Uri.decode(rawId)
-                
+
                     val viewModel: PodcastDetailViewModel = hiltViewModel()
                     PodcastDetailScreen(
                         viewModel = viewModel,
