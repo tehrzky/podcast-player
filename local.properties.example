@@ -1,0 +1,5 @@
+# Example local.properties
+# Place your real keys here or configure them in GitHub repository secrets
+PODCASTINDEX_KEY=YOUR_PODCAST_INDEX_API_KEY
+PODCASTINDEX_SECRET=YOUR_PODCAST_INDEX_API_SECRET
+GOOGLE_WEB_CLIENT_ID=YOUR_GOOGLE_WEB_CLIENT_ID
