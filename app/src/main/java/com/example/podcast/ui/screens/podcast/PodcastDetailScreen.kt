@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,6 +22,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -30,11 +30,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -53,15 +54,21 @@ import com.example.podcast.ui.components.SortChip
 @Composable
 fun PodcastDetailScreen(
     viewModel: PodcastDetailViewModel,
+    podcastId: String,
     onBackClick: () -> Unit,
     onEpisodeClick: (String) -> Unit
 ) {
+    // *** THE FIX: tell the ViewModel which podcast to load ***
+    LaunchedEffect(podcastId) {
+        if (podcastId.isNotBlank()) {
+            viewModel.loadPodcast(podcastId)
+        }
+    }
+
     val podcast by viewModel.podcast.collectAsState()
     val episodes by viewModel.episodes.collectAsState()
     val currentSort by viewModel.currentSort.collectAsState()
     val downloadProgressMap by viewModel.downloadProgressMap.collectAsState()
-
-    val currentPod = podcast ?: return
 
     Scaffold(
         topBar = {
@@ -83,13 +90,34 @@ fun PodcastDetailScreen(
             )
         }
     ) { innerPadding ->
+        // *** THE FIX: show loading/error states instead of returning ***
+        val currentPod = podcast
+        if (currentPod == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Loading podcast...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            return@Scaffold
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
             contentPadding = PaddingValues(bottom = 120.dp)
         ) {
-            // Header Info
             item {
                 Column(
                     modifier = Modifier
@@ -111,7 +139,7 @@ fun PodcastDetailScreen(
                     Text(
                         text = currentPod.title,
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        textAlign = TextAlign.Center
                     )
 
                     Text(
@@ -119,7 +147,7 @@ fun PodcastDetailScreen(
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        textAlign = TextAlign.Center
                     )
 
                     if (currentPod.description.isNotBlank()) {
@@ -133,7 +161,6 @@ fun PodcastDetailScreen(
                         )
                     }
 
-                    // Action Buttons Row
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -170,7 +197,6 @@ fun PodcastDetailScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Sort Control Row
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -191,7 +217,6 @@ fun PodcastDetailScreen(
                 }
             }
 
-            // Episode List
             items(episodes) { episode ->
                 EpisodeRow(
                     episode = episode,
