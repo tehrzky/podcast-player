@@ -80,6 +80,24 @@ class PodcastRepository @Inject constructor(
             }
         }
 
+        // Persist search results to Room (insert-only, never overwrite existing rows)
+        // so PodcastDetailScreen can find them via getPodcastById(id).
+        if (results.isNotEmpty()) {
+            val now = System.currentTimeMillis()
+            results.forEach { p ->
+                val existing = podcastDao.getPodcastByIdSync(p.id)
+                if (existing == null) {
+                    podcastDao.insertPodcast(
+                        p.copy(
+                            subscribed = false,
+                            addedAt = now,
+                            lastRefreshedAt = 0L
+                        )
+                    )
+                }
+            }
+        }
+
         results
     }
 
@@ -90,6 +108,30 @@ class PodcastRepository @Inject constructor(
             subscribed = true,
             addedAt = now,
             lastRefreshedAt = now
+        )
+        podcastDao.insertPodcast(podcastToSave)
+        episodeDao.insertEpisodes(parsed.episodes)
+        podcastToSave
+    }
+
+    /**
+     * Fetch and persist a feed WITHOUT changing subscription state.
+     * Used by PodcastDetailScreen when it opens a search result that has
+     * zero episodes cached (feed not yet fetched).
+     */
+    suspend fun fetchAndPersistFeed(feedUrl: String): Podcast = withContext(Dispatchers.IO) {
+        val parsed = rssFeedParser.fetchAndParseFeed(feedUrl)
+        val now = System.currentTimeMillis()
+        val existing = podcastDao.getPodcastByIdSync(parsed.podcast.id)
+        val podcastToSave = parsed.podcast.copy(
+            subscribed = existing?.subscribed ?: false,
+            addedAt = existing?.addedAt ?: now,
+            lastRefreshedAt = now,
+            defaultSortOrder = existing?.defaultSortOrder,
+            defaultPlaybackDirection = existing?.defaultPlaybackDirection,
+            playbackSpeedOverride = existing?.playbackSpeedOverride,
+            autoDownloadNew = existing?.autoDownloadNew ?: false,
+            autoDownloadLastN = existing?.autoDownloadLastN ?: 0
         )
         podcastDao.insertPodcast(podcastToSave)
         episodeDao.insertEpisodes(parsed.episodes)
