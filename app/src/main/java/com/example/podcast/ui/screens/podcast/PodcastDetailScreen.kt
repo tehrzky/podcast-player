@@ -16,7 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
@@ -58,17 +58,15 @@ fun PodcastDetailScreen(
     onBackClick: () -> Unit,
     onEpisodeClick: (String) -> Unit
 ) {
-    // *** THE FIX: tell the ViewModel which podcast to load ***
     LaunchedEffect(podcastId) {
-        if (podcastId.isNotBlank()) {
-            viewModel.loadPodcast(podcastId)
-        }
+        viewModel.loadPodcast(podcastId)
     }
 
     val podcast by viewModel.podcast.collectAsState()
     val episodes by viewModel.episodes.collectAsState()
     val currentSort by viewModel.currentSort.collectAsState()
     val downloadProgressMap by viewModel.downloadProgressMap.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
     Scaffold(
         topBar = {
@@ -76,7 +74,7 @@ fun PodcastDetailScreen(
                 title = { },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
@@ -90,7 +88,6 @@ fun PodcastDetailScreen(
             )
         }
     ) { innerPadding ->
-        // *** THE FIX: show loading/error states instead of returning ***
         val currentPod = podcast
         if (currentPod == null) {
             Box(
@@ -103,7 +100,7 @@ fun PodcastDetailScreen(
                     CircularProgressIndicator()
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Loading podcast...",
+                        text = if (isLoading) "Loading podcast..." else "Fetching feed...",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
