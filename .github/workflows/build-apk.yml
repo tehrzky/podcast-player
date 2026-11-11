@@ -14,7 +14,7 @@ jobs:
   build:
     name: Build Debug & Release APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -29,13 +29,24 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Decode secrets (optional)
-        if: ${{ secrets.PODCASTINDEX_KEY != '' }}
+      - name: Write local.properties (secrets optional)
+        env:
+          PODCASTINDEX_KEY: ${{ secrets.PODCASTINDEX_KEY }}
+          PODCASTINDEX_SECRET: ${{ secrets.PODCASTINDEX_SECRET }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
         run: |
-          mkdir -p ~/.gradle
-          echo "PODCASTINDEX_KEY=${{ secrets.PODCASTINDEX_KEY }}" >> local.properties
-          echo "PODCASTINDEX_SECRET=${{ secrets.PODCASTINDEX_SECRET }}" >> local.properties
-          echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> local.properties
+          touch local.properties
+          if [ -n "$PODCASTINDEX_KEY" ]; then
+            echo "PODCASTINDEX_KEY=$PODCASTINDEX_KEY" >> local.properties
+          fi
+          if [ -n "$PODCASTINDEX_SECRET" ]; then
+            echo "PODCASTINDEX_SECRET=$PODCASTINDEX_SECRET" >> local.properties
+          fi
+          if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
+            echo "GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID" >> local.properties
+          fi
+          echo "--- local.properties (masked) ---"
+          sed 's/=.*/=<set>/' local.properties
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew || true
@@ -43,7 +54,7 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Build Release APK (unsigned, if signing not configured)
+      - name: Build Release APK (unsigned if not configured)
         run: ./gradlew assembleRelease --no-daemon --stacktrace || true
 
       - name: Run unit tests
