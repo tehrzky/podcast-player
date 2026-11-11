@@ -44,6 +44,9 @@ class PodcastDetailViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
     val podcast: StateFlow<Podcast?> = podcastRepository.getPodcastById(podcastId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
@@ -51,7 +54,9 @@ class PodcastDetailViewModel @Inject constructor(
     val currentSort: StateFlow<EpisodeSortOrder?> = _currentSort.asStateFlow()
 
     val episodes: StateFlow<List<Episode>> = combine(podcast.filterNotNull(), _currentSort) { pod, overrideSort ->
-        val effectiveSort = overrideSort ?: pod.defaultSortOrder ?: settingsDataStore.settingsFlow.first().defaultEpisodeSort
+        val effectiveSort = overrideSort
+            ?: pod.defaultSortOrder
+            ?: settingsDataStore.settingsFlow.first().defaultEpisodeSort
         effectiveSort
     }.flatMapLatest { sort ->
         episodeRepository.getEpisodesSorted(podcastId, sort)
@@ -60,32 +65,36 @@ class PodcastDetailViewModel @Inject constructor(
     val downloadProgressMap: StateFlow<Map<String, DownloadProgress>> = downloadManager.downloadProgressMap
 
     /**
-     * Ensure the podcast is persisted in Room before we try to read it.
      * Called from the UI via LaunchedEffect(podcastId).
-     * - If it already exists locally: just load sort order.
-     * - If it's from search (not in Room yet): fetch its feed and insert.
+     * Ensures the podcast is in Room and, if it has no episodes cached yet,
+     * fetches its feed so the episode list populates.
      */
     fun loadPodcast(id: String) {
-        if (id.isBlank()) return
+        if (id.isBlank()) {
+            _errorMessage.value = "Invalid podcast ID"
+            return
+        }
         viewModelScope.launch {
             _isLoading.value = true
+            _errorMessage.value = null
             try {
-                // Check if it exists in local DB
                 val existing = podcastRepository.getPodcastByIdSync(id)
-
                 if (existing == null) {
-                    // Not in Room → try to fetch from feed URL (id IS the feed URL for search results)
-                    // This uses the repository's fetch-and-persist path.
-                    podcastRepository.subscribeAndFetch(id)
+                    _errorMessage.value = "Podcast not found. Try searching again."
+                    return@launch
                 }
 
-                // After ensuring it exists, seed sort state
-                val pod = podcastRepository.getPodcastByIdSync(id)
-                pod?.let {
-                    _currentSort.value = it.defaultSortOrder
+                // Fetch feed if we have no episodes cached for this podcast
+                val cachedEpisodes = episodes.value
+                if (cachedEpisodes.isEmpty()) {
+                    podcastRepository.fetchAndPersistFeed(existing.feedUrl)
                 }
+
+                val refreshed = podcastRepository.getPodcastByIdSync(id)
+                _currentSort.value = refreshed?.defaultSortOrder
             } catch (e: Exception) {
                 android.util.Log.e("PodcastDetailVM", "Failed to load podcast $id", e)
+                _errorMessage.value = "Failed to load feed: ${e.message ?: "unknown error"}"
             } finally {
                 _isLoading.value = false
             }
@@ -109,7 +118,12 @@ class PodcastDetailViewModel @Inject constructor(
     fun refresh() {
         val currentPod = podcast.value ?: return
         viewModelScope.launch {
-            podcastRepository.refreshFeed(currentPod.id, currentPod.feedUrl)
+            _isLoading.value = true
+            try {
+                podcastRepository.refreshFeed(currentPod.id, currentPod.feedUrl)
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 
