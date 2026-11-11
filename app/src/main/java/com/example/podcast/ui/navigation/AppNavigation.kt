@@ -149,8 +149,7 @@ fun AppNavigation(
                 ) { backStackEntry ->
                     val rawId = backStackEntry.arguments?.getString("podcastId").orEmpty()
                     val podcastId = Uri.decode(rawId)
-                    Log.d("PodcastNav", "PodcastDetail received id: $podcastId")
-
+                
                     val viewModel: PodcastDetailViewModel = hiltViewModel()
                     PodcastDetailScreen(
                         viewModel = viewModel,
